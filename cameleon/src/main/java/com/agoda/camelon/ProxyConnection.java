@@ -1,5 +1,6 @@
 package com.agoda.camelon;
 
+import java.lang.reflect.Proxy;
 import java.sql.*;
 import java.util.Map;
 import java.util.Properties;
