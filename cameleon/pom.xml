@@ -13,7 +13,9 @@
         <maven.compiler.target>11</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
+<build>
 
+</build>
     <dependencies>
         <dependency>
             <groupId>com.microsoft.sqlserver</groupId>
@@ -21,4 +23,6 @@
             <version>12.8.1.jre11</version>
         </dependency>
     </dependencies>
+
+
 </project>

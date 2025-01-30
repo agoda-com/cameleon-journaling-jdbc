@@ -1,30 +1,76 @@
 package com.agoda.camelon;
 
+import com.agoda.camelon.journaler.ConsoleJournaler;
+
 import java.sql.*;
 
 public class ProxyStatement implements Statement {
     private final Statement statement;
-    private final ChangeEventCapture changeEventCapture = new ChangeEventCapture();
+    private final ConsoleJournaler changeEventCapture = new ConsoleJournaler();
     public ProxyStatement(Statement statement) {
         this.statement = statement;
     }
 
     @Override
-    public ResultSet executeQuery(String sql) throws SQLException {
+    public boolean execute(String sql) throws SQLException {
+        boolean isSuccess=true;
         try {
-            changeEventCapture.BeforeQuery("executeQuery", sql);
-            return statement.executeQuery(sql);
-        }finally {
-            changeEventCapture.AfterQuery("executeQuery", sql);
+            return statement.execute(sql);
+        }catch (SQLException sqlException)
+        {
+            isSuccess = false;
+            throw sqlException;
+        }
+        finally {
+            var updateCount= statement.getUpdateCount();
+            if( updateCount>0 && !isSuccess) {
+                statement.cancel();
+                changeEventCapture.onRollback("execute", sql, new String[0]);
+            }else {
+                changeEventCapture.onCommit("execute", updateCount, sql, new String[0]);
+            }
         }    }
+
+
+    @Override
+    public ResultSet executeQuery(String sql) throws SQLException {
+        boolean isSuccess=true;
+        try {
+            return statement.executeQuery(sql);
+        }catch (SQLException sqlException)
+        {
+            isSuccess = false;
+            throw sqlException;
+        }
+        finally {
+            var updateCount= statement.getUpdateCount();
+            if( updateCount>0 && !isSuccess) {
+                statement.cancel();
+                changeEventCapture.onRollback("executeQuery", sql, new String[0]);
+            }else {
+                changeEventCapture.onCommit("executeQuery", updateCount, sql, new String[0]);
+            }
+        }
+    }
 
     @Override
     public int executeUpdate(String sql) throws SQLException {
+        boolean isSuccess=true;
         try {
-            changeEventCapture.BeforeQuery("executeUpdate", sql);
             return statement.executeUpdate(sql);
-        }finally {
-            changeEventCapture.AfterQuery("executeUpdate", sql);
+        }catch (SQLException sqlException)
+        {
+            isSuccess = false;
+            throw sqlException;
+        }
+        finally {
+            var updateCount= statement.getUpdateCount();
+            if( updateCount>0 && !isSuccess) {
+                statement.cancel();
+                changeEventCapture.onRollback("executeUpdate", sql, new String[0]);
+            }else {
+                changeEventCapture.onCommit("executeUpdate", updateCount, sql, new String[0]);
+            }
         }
     }
 
@@ -87,12 +133,6 @@ public class ProxyStatement implements Statement {
     public void setCursorName(String name) throws SQLException {
         statement.setCursorName(name);
     }
-
-    @Override
-    public boolean execute(String sql) throws SQLException {
-        return statement.execute(sql);
-    }
-
     @Override
     public ResultSet getResultSet() throws SQLException {
         return statement.getResultSet();
