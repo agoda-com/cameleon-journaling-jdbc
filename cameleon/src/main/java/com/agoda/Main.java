@@ -12,6 +12,8 @@ public class Main {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+        // prepare
+        PrepareEnv();
         // this won't log
         SelectQuery();
         // this will log "commit"
@@ -23,6 +25,20 @@ public class Main {
     private static Connection getConnection() throws SQLException {
       return  DriverManager.getConnection("jdbc:cameleon://localhost:1433;databaseName=master;encrypt=false","sa","agoda123*");
     }
+
+    private static void PrepareEnv() {
+        try(var connection  = getConnection()){
+            var statement = connection.createStatement();
+            statement.execute("DROP TABLE IF EXISTS dbo.example;CREATE TABLE dbo.example (\n" +
+                    "    name NVARCHAR(255) NOT NULL\n" +
+                    ");");
+            statement.execute("INSERT INTO dbo.example (name) VALUES ('test')");
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+    }
+
+
 
     private static void SelectQuery(){
         try(var connection  = getConnection()){
