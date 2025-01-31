@@ -50,7 +50,7 @@ public class Main {
                     "AS\n" +
                     "BEGIN\n" +
                     "\tINSERT INTO dbo.example (id, name) VALUES (@Id,@Name),(@Id2,@Name2);\n" +
-                    "END;");
+                    "END;\n");
             statement.execute("INSERT INTO dbo.example (id, name) VALUES (1,'lorem ipsum');");
         }catch(Exception e){
             e.printStackTrace();
@@ -80,15 +80,21 @@ public class Main {
 
     private static void TryRolledBack()
     {
-        ExecuteSP("EXEC [dbo].[sp_failed_transaction] 8, N'transaction1',89, N'transaction1';",8);
-        ExecuteSP("EXEC [dbo].[sp_failed_transaction] 90, N'transaction2',89, N'transaction2';",88);
+        ExecuteSP("EXEC [dbo].[sp_failed_transaction] 8, N'transaction1',8, N'transaction1-1';",8);
+        ExecuteSP("EXEC [dbo].[sp_failed_transaction] 8, N'transaction2',88, N'transaction2-1';",88);
+        ExecuteSP("EXEC [dbo].[sp_failed_transaction] 9, N'transaction3',99, N'transaction3-1';",12123);
+
     }
 
     private static void ExecuteSP(String sql, int threadId) {
         try (var connection = getConnection()){
             try (var statement = connection.createStatement()) {
                 System.out.println("Thread " + threadId + " started.");
-                if(statement.execute(sql)) {
+                var hasRs = statement.execute(sql);
+                if(threadId==12123){
+                    System.exit(-1);
+                }
+                if(hasRs) {
                    var resultSet = statement.getResultSet();
                    while(resultSet.next()){
                        System.out.println(resultSet.getString("id")
