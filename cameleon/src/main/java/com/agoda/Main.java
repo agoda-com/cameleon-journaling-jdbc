@@ -44,18 +44,13 @@ public class Main {
                     "END");
             statement.execute("CREATE PROCEDURE sp_failed_transaction\n" +
                     "\t@Id INT,\n" +
-                    "\t@Name VARCHAR,\n" +
+                    "\t@Name NVARCHAR(50),\n" +
                     "\t@Id2 INT,\n" +
-                    "\t@Name2 VARCHAR\n" +
+                    "\t@Name2 NVARCHAR(50)\n" +
                     "AS\n" +
-                    "BEGIN\t\n" +
-                    "\tINSERT INTO dbo.example (id, name)\n" +
-                    "    VALUES (@Id,@Name);\n" +
-                    "\tINSERT INTO dbo.example (id, name)\n" +
-                    "    VALUES (@Id2,@Name2);\n" +
-                    "\tSELECT * FROM  dbo.example WITH (nolock)\n" +
-                    "\tWHERE id IN (@Id,@id2);\n" +
-                    "END\n");
+                    "BEGIN\n" +
+                    "\tINSERT INTO dbo.example (id, name) VALUES (@Id,@Name),(@Id2,@Name2);\n" +
+                    "END;");
             statement.execute("INSERT INTO dbo.example (id, name) VALUES (1,'lorem ipsum');");
         }catch(Exception e){
             e.printStackTrace();
@@ -85,8 +80,8 @@ public class Main {
 
     private static void TryRolledBack()
     {
-        ExecuteSP("EXEC [dbo].[sp_failed_transaction] 88, N'transaction1',89, N'transaction1';",8);
-        ExecuteSP("EXEC [dbo].[sp_failed_transaction] 88, N'transaction2',89, N'transaction2';",88);
+        ExecuteSP("EXEC [dbo].[sp_failed_transaction] 8, N'transaction1',89, N'transaction1';",8);
+        ExecuteSP("EXEC [dbo].[sp_failed_transaction] 90, N'transaction2',89, N'transaction2';",88);
     }
 
     private static void ExecuteSP(String sql, int threadId) {
