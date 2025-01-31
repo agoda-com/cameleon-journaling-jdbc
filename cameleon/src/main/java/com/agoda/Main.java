@@ -1,5 +1,6 @@
 package com.agoda;
 
+import com.agoda.camelon.ProxyConnection;
 import com.agoda.camelon.ProxyDriver;
 import com.microsoft.sqlserver.jdbc.SQLServerDriver;
 import java.util.concurrent.CountDownLatch;
@@ -21,10 +22,12 @@ public class Main {
         TryModify();
         // this will log rolled back
         TryRolledBack();
+        System.out.flush();
+        System.err.flush();
     }
 
-    private static Connection getConnection() throws SQLException {
-      return  DriverManager.getConnection("jdbc:cameleon://localhost:1433;databaseName=master;encrypt=false","sa","agoda123*");
+    private static ProxyConnection getConnection() throws SQLException {
+      return  (ProxyConnection)DriverManager.getConnection("jdbc:cameleon://localhost:1433;databaseName=master;encrypt=false","sa","agoda123*");
     }
 
     private static void PrepareEnv() {
@@ -41,25 +44,18 @@ public class Main {
                     "END");
             statement.execute("CREATE PROCEDURE sp_failed_transaction\n" +
                     "\t@Id INT,\n" +
-                    "\t@Name VARCHAR\n" +
+                    "\t@Name VARCHAR,\n" +
+                    "\t@Id2 INT,\n" +
+                    "\t@Name2 VARCHAR\n" +
                     "AS\n" +
                     "BEGIN\t\n" +
                     "\tINSERT INTO dbo.example (id, name)\n" +
                     "    VALUES (@Id,@Name);\n" +
-                    "\tIF @Id =88\n" +
-                    "\tBEGIN\t\n" +
-                    "EXEC sys.sp_addmessage\n" +
-                    "    @msgnum = 60000,\n" +
-                    "    @severity = 16,\n" +
-                    "    @msgtext = N'This is a test message with one numeric parameter (%d), one string parameter (%s), and another string parameter (%s).',\n" +
-                    "    @lang = 'us_english';\n" +
-                    "\n" +
-                    "DECLARE @msg NVARCHAR(2048) = FORMATMESSAGE(60000, 500, N'First string', N'second string');\n" +
-                    "\n" +
-                    "THROW 60000, @msg, 1;\n" +
-                    "\t\t\n" +
-                    "\tEND\t\n" +
-                    "END");
+                    "\tINSERT INTO dbo.example (id, name)\n" +
+                    "    VALUES (@Id2,@Name2);\n" +
+                    "\tSELECT * FROM  dbo.example WITH (nolock)\n" +
+                    "\tWHERE id IN (@Id,@id2);\n" +
+                    "END\n");
             statement.execute("INSERT INTO dbo.example (id, name) VALUES (1,'lorem ipsum');");
         }catch(Exception e){
             e.printStackTrace();
@@ -89,31 +85,28 @@ public class Main {
 
     private static void TryRolledBack()
     {
-        var latch = new CountDownLatch(1);
-
-        var thread1 = new Thread(() -> ExecuteSP(latch,"EXEC [dbo].[sp_failed_transaction] 8,8",8));
-        var thread2 = new Thread(() -> ExecuteSP(latch,"EXEC [dbo].[sp_failed_transaction] 8,123", 88));
-        thread2.start();
-        thread1.start();
+        ExecuteSP("EXEC [dbo].[sp_failed_transaction] 88, N'transaction1',89, N'transaction1';",8);
+        ExecuteSP("EXEC [dbo].[sp_failed_transaction] 88, N'transaction2',89, N'transaction2';",88);
     }
 
-    private static void ExecuteSP(CountDownLatch latch,String sql, int threadId) {
-        try {
-            var connection = getConnection();
+    private static void ExecuteSP(String sql, int threadId) {
+        try (var connection = getConnection()){
             try (var statement = connection.createStatement()) {
-                connection.setAutoCommit(false);
                 System.out.println("Thread " + threadId + " started.");
-                statement.execute(sql);
+                if(statement.execute(sql)) {
+                   var resultSet = statement.getResultSet();
+                   while(resultSet.next()){
+                       System.out.println(resultSet.getString("id")
+                       +":"+resultSet.getString("name"));
+                   };
+                }
                 System.out.println("Thread " + threadId + " completed.");
-                connection.commit();
-            } catch (SQLException e) {
-                System.err.println("Thread " + threadId + " failed: " + e.getMessage());
-                connection.rollback();
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                System.err.println("Thread " + threadId + " failed: " + e.getMessage());
             }
-        }catch (SQLException e){
-            throw new RuntimeException(e);
+        }catch (Exception e){
+            e.printStackTrace();
         }
+
     }
 }

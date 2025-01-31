@@ -4,21 +4,68 @@ import com.agoda.camelon.journaler.ConsoleJournaler;
 
 import java.lang.reflect.Proxy;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 
 public class ProxyConnection implements Connection {
     private final Connection realConnection;
     private final ConsoleJournaler changeEventCapture = new ConsoleJournaler();
+    private final List<ProxyStatement> historicalStatements= new ArrayList<>();
     public ProxyConnection(Connection connection)
     {
         this.realConnection = connection;
+        try {
+            setAutoCommit(false);
+        }catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
     @Override
     public Statement createStatement() throws SQLException {
-        return  new ProxyStatement(realConnection.createStatement());
+        var statement=  new ProxyStatement(realConnection.createStatement());
+        historicalStatements.add(statement);
+        return statement;
     }
+    @Override
+    public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
+        var statement = new ProxyStatement(realConnection.createStatement(resultSetType, resultSetConcurrency));
+        historicalStatements.add(statement);
+        return statement;
+    }
+    @Override
+    public void close() throws SQLException {
+        var lastError  =historicalStatements.stream()
+                .map((s)->
+                        s.Exceptions.stream()
+                                .map((Throwable::toString))
+                                .collect(Collectors.joining(",")))
+                .collect(Collectors.joining(","));
+        try {
+            if(lastError.equals(""))
+                commit();
+            else
+                rollback();
+        }catch (SQLException e) {
+            rollback();
+        }
+        realConnection.close();
+    }
+    @Override
+    public void commit() throws SQLException {
+        changeEventCapture.onCommit(historicalStatements.stream().map((s)->s.toString()).collect(Collectors.joining(",")));
+        realConnection.commit();
+    }
+
+    @Override
+    public void rollback() throws SQLException {
+        changeEventCapture.onRollback(historicalStatements.stream().map((s)->s.toString()).collect(Collectors.joining(",")));
+        realConnection.rollback();
+    }
+
 
     @Override
     public PreparedStatement prepareStatement(String sql) throws SQLException {
@@ -45,22 +92,7 @@ public class ProxyConnection implements Connection {
         return realConnection.getAutoCommit();
     }
 
-    @Override
-    public void commit() throws SQLException {
-        changeEventCapture.onCommit(realConnection.getWarnings());
-        realConnection.commit();
-    }
 
-    @Override
-    public void rollback() throws SQLException {
-        changeEventCapture.onRollback(realConnection.getWarnings());
-        realConnection.rollback();
-    }
-
-    @Override
-    public void close() throws SQLException {
-        realConnection.close();
-    }
 
     @Override
     public boolean isClosed() throws SQLException {
@@ -112,10 +144,7 @@ public class ProxyConnection implements Connection {
         realConnection.clearWarnings();
     }
 
-    @Override
-    public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
-        return  new ProxyStatement(realConnection.createStatement(resultSetType, resultSetConcurrency));
-    }
+
 
     @Override
     public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {

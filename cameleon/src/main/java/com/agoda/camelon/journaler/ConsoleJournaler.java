@@ -17,17 +17,17 @@ public class ConsoleJournaler implements CameleonJournaler {
 
     @Override
     public void onFailure(String methodName, Exception ex, String sql, String[] parameters) {
-        System.out.println("Failure "+methodName + ": " + sql + " rolled back caused by: " + ex.getLocalizedMessage());
+        System.err.println("Failure "+methodName + ": " + sql + " rolled back caused by: " + ex.getLocalizedMessage());
     }
 
     @Override
-    public void onCommit(SQLWarning warning) {
-        System.out.println("Commit " + warning);
+    public void onCommit(String sql) {
+        System.out.println("Commit " + sql);
     }
 
     @Override
-    public void onRollback(SQLWarning warning) {
-        System.out.println("Rollback " + warning);
+    public void onRollback(String sql) {
+        System.err.println("Rollback " + sql);
     }
 
 }

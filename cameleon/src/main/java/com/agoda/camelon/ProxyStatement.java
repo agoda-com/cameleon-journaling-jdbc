@@ -3,6 +3,9 @@ package com.agoda.camelon;
 import com.agoda.camelon.journaler.ConsoleJournaler;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class ProxyStatement implements Statement {
     private final Statement statement;
@@ -10,17 +13,25 @@ public class ProxyStatement implements Statement {
     public ProxyStatement(Statement statement) {
         this.statement = statement;
     }
+    public final List<SQLException> Exceptions = new ArrayList<>();
+    private final List<String> ExecuteSqls = new ArrayList<>();
 
+    @Override
+    public String toString() {
+        return ExecuteSqls.stream().collect(Collectors.joining("\n"));
+    }
     @Override
     public boolean execute(String sql) throws SQLException {
         boolean result = false;
         try {
+            ExecuteSqls.add(sql);
             changeEventCapture.onBegin("excute", sql,new String[0]);
             result =statement.execute(sql);
             var updateCount= statement.getUpdateCount();
             changeEventCapture.onSuccess("execute", updateCount, sql, new String[0]);
         }catch (SQLException sqlException)
         {
+            Exceptions.add(sqlException);
             changeEventCapture.onFailure("execute", sqlException,sql, new String[0]);
             throw sqlException;
         }
@@ -32,12 +43,14 @@ public class ProxyStatement implements Statement {
     public ResultSet executeQuery(String sql) throws SQLException {
         ResultSet result = null;
         try {
+            ExecuteSqls.add(sql);
             changeEventCapture.onBegin("executeQuery", sql,new String[0]);
             result =statement.executeQuery(sql);
             var updateCount= statement.getUpdateCount();
             changeEventCapture.onSuccess("executeQuery", updateCount, sql, new String[0]);
         }catch (SQLException sqlException)
         {
+            Exceptions.add(sqlException);
             changeEventCapture.onFailure("executeQuery", sqlException,sql, new String[0]);
             throw sqlException;
         }
@@ -48,12 +61,14 @@ public class ProxyStatement implements Statement {
     public int executeUpdate(String sql) throws SQLException {
         int result = -1;
         try {
+            ExecuteSqls.add(sql);
             changeEventCapture.onBegin("executeUpdate", sql,new String[0]);
             result =statement.executeUpdate(sql);
             var updateCount= statement.getUpdateCount();
             changeEventCapture.onSuccess("executeUpdate", updateCount, sql, new String[0]);
         }catch (SQLException sqlException)
         {
+            Exceptions.add(sqlException);
             changeEventCapture.onFailure("executeUpdate", sqlException,sql, new String[0]);
             throw sqlException;
         }
