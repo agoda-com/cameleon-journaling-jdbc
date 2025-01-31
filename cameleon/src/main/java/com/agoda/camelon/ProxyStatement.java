@@ -13,22 +13,16 @@ public class ProxyStatement implements Statement {
 
     @Override
     public boolean execute(String sql) throws SQLException {
-        SQLException exception  = null;
         boolean result = false;
         try {
             changeEventCapture.onBegin("excute", sql,new String[0]);
             result =statement.execute(sql);
+            var updateCount= statement.getUpdateCount();
+            changeEventCapture.onSuccess("execute", updateCount, sql, new String[0]);
         }catch (SQLException sqlException)
         {
-            exception = sqlException;
-        }
-        finally {
-            var updateCount= statement.getUpdateCount();
-            if( updateCount>0 && (exception!=null)) {
-                changeEventCapture.onRollback("execute", sql, new String[0]);
-            }else {
-                changeEventCapture.onCommit("execute", updateCount, sql, new String[0]);
-            }
+            changeEventCapture.onFailure("execute", sqlException,sql, new String[0]);
+            throw sqlException;
         }
         return result;
     }
@@ -36,47 +30,34 @@ public class ProxyStatement implements Statement {
 
     @Override
     public ResultSet executeQuery(String sql) throws SQLException {
-        boolean isSuccess=true;
+        ResultSet result = null;
         try {
             changeEventCapture.onBegin("executeQuery", sql,new String[0]);
-            return statement.executeQuery(sql);
+            result =statement.executeQuery(sql);
+            var updateCount= statement.getUpdateCount();
+            changeEventCapture.onSuccess("executeQuery", updateCount, sql, new String[0]);
         }catch (SQLException sqlException)
         {
-            isSuccess = false;
+            changeEventCapture.onFailure("executeQuery", sqlException,sql, new String[0]);
             throw sqlException;
         }
-        finally {
-            var updateCount= statement.getUpdateCount();
-            if( updateCount>0 && !isSuccess) {
-                statement.cancel();
-                changeEventCapture.onRollback("executeQuery", sql, new String[0]);
-            }else {
-                changeEventCapture.onCommit("executeQuery", updateCount, sql, new String[0]);
-            }
-        }
+        return result;
     }
 
     @Override
     public int executeUpdate(String sql) throws SQLException {
-        SQLException exception=null;
-        int updateCount=0;
+        int result = -1;
         try {
             changeEventCapture.onBegin("executeUpdate", sql,new String[0]);
-            updateCount = statement.executeUpdate(sql);
+            result =statement.executeUpdate(sql);
+            var updateCount= statement.getUpdateCount();
+            changeEventCapture.onSuccess("executeUpdate", updateCount, sql, new String[0]);
         }catch (SQLException sqlException)
         {
-            exception = sqlException;
+            changeEventCapture.onFailure("executeUpdate", sqlException,sql, new String[0]);
+            throw sqlException;
         }
-        finally {
-            if( updateCount>0 && exception !=null) {
-                statement.cancel();
-                changeEventCapture.onRollback("executeUpdate", sql, new String[0]);
-                throw exception;
-            }else {
-                changeEventCapture.onCommit("executeUpdate", updateCount, sql, new String[0]);
-            }
-        }
-        return updateCount;
+        return result;
     }
 
     @Override

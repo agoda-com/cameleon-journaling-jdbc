@@ -1,5 +1,7 @@
 package com.agoda.camelon;
 
+import com.agoda.camelon.journaler.ConsoleJournaler;
+
 import java.lang.reflect.Proxy;
 import java.sql.*;
 import java.util.Map;
@@ -8,6 +10,7 @@ import java.util.concurrent.Executor;
 
 public class ProxyConnection implements Connection {
     private final Connection realConnection;
+    private final ConsoleJournaler changeEventCapture = new ConsoleJournaler();
     public ProxyConnection(Connection connection)
     {
         this.realConnection = connection;
@@ -44,11 +47,13 @@ public class ProxyConnection implements Connection {
 
     @Override
     public void commit() throws SQLException {
+        changeEventCapture.onCommit(realConnection.getWarnings());
         realConnection.commit();
     }
 
     @Override
     public void rollback() throws SQLException {
+        changeEventCapture.onRollback(realConnection.getWarnings());
         realConnection.rollback();
     }
 
