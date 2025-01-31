@@ -91,19 +91,19 @@ public class Main {
     {
         var latch = new CountDownLatch(1);
 
-        var thread1 = new Thread(() -> ExecuteSP(latch,8));
-        var thread2 = new Thread(() -> ExecuteSP(latch,88));
+        var thread1 = new Thread(() -> ExecuteSP(latch,"EXEC [dbo].[sp_failed_transaction] 8,8",8));
+        var thread2 = new Thread(() -> ExecuteSP(latch,"EXEC [dbo].[sp_failed_transaction] 8,123", 88));
         thread2.start();
         thread1.start();
     }
 
-    private static void ExecuteSP(CountDownLatch latch, int threadId) {
+    private static void ExecuteSP(CountDownLatch latch,String sql, int threadId) {
         try {
             var connection = getConnection();
             try (var statement = connection.createStatement()) {
                 connection.setAutoCommit(false);
                 System.out.println("Thread " + threadId + " started.");
-                statement.execute("EXEC [dbo].[sp_failed_transaction] 8,'" + threadId + "';");
+                statement.execute(sql);
                 System.out.println("Thread " + threadId + " completed.");
                 connection.commit();
             } catch (SQLException e) {
